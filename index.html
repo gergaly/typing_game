@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .slider {
+            width: 100px;
+        }
+        .label {
+            min-width: 120px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <div class="control-row">
+            <span id="score" class="label">Score: 0</span>
+        </div>
+        <div class="control-row">
+            <span id="speedLabel" class="label">Speed: 1x</span>
+            <input type="range" id="speedControl" class="slider" min="0.5" max="3" step="0.1" value="1">
+        </div>
+        <div class="control-row">
+            <span id="enemyLabel" class="label">Max Enemies: 10</span>
+            <input type="range" id="enemyControl" class="slider" min="1" max="30" step="1" value="10">
+        </div>
+        <div class="control-row">
+            <span id="levelLabel" class="label">Player Level: 1</span>
+            <input type="range" id="levelControl" class="slider" min="1" max="100" step="1" value="1">
+        </div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const speedControl = document.getElementById('speedControl');
+        const enemyControl = document.getElementById('enemyControl');
+        const levelControl = document.getElementById('levelControl');
+        const speedLabel = document.getElementById('speedLabel');
+        const enemyLabel = document.getElementById('enemyLabel');
+        const levelLabel = document.getElementById('levelLabel');
+        const scoreDisplay = document.getElementById('score');
+
+        // Game state
+        const gameState = {
+            player: {
+                relativeSize: 0.05,
+                level: 1
+            },
+            enemies: [],
+            score: 0,
+            lastEnemyTime: 0,
+            enemySpawnDelay: 2000,
+            baseEnemySpeed: 0.0015,
+            speedMultiplier: 1,
+            maxEnemies: 10
+        };
+
+        speedControl.addEventListener('input', (e) => {
+            gameState.speedMultiplier = parseFloat(e.target.value);
+            speedLabel.textContent = `Speed: ${gameState.speedMultiplier.toFixed(1)}x`;
+        });
+
+        enemyControl.addEventListener('input', (e) => {
+            gameState.maxEnemies = parseInt(e.target.value);
+            enemyLabel.textContent = `Max Enemies: ${gameState.maxEnemies}`;
+        });
+
+        levelControl.addEventListener('input', (e) => {
+            gameState.player.level = parseInt(e.target.value);
+            levelLabel.textContent = `Player Level: ${gameState.player.level}`;
+        });
+
+        function getRandomColor() {
+            const colors = ['red', 'green', 'purple', 'orange', 'pink'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function createEnemy() {
+            const size = canvas.height * 0.03;
+            let x, y;
+
+            const edge = Math.floor(Math.random() * 3);
+
+            switch(edge) {
+                case 0:
+                    x = Math.random() * canvas.width;
+                    y = -size;
+                    break;
+                case 1:
+                    x = canvas.width + size;
+                    y = Math.random() * (canvas.height * 0.7);
+                    break;
+                case 2:
+                    x = -size;
+                    y = Math.random() * (canvas.height * 0.7);
+                    break;
+            }
+
+            const playerSize = canvas.height * gameState.player.relativeSize;
+            const targetX = (canvas.width - playerSize) / 2;
+            const targetY = canvas.height - playerSize;
+
+            const dx = targetX - x;
+            const dy = targetY - y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Random level from 1 to player's level
+            const level = Math.floor(Math.random() * gameState.player.level) + 1;
+
+            return {
+                x,
+                y,
+                size,
+                color: getRandomColor(),
+                dx: (dx / distance) * gameState.baseEnemySpeed * canvas.width,
+                dy: (dy / distance) * gameState.baseEnemySpeed * canvas.width,
+                level: level
+            };
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateGame() {
+            const currentTime = Date.now();
+
+            if (currentTime - gameState.lastEnemyTime > gameState.enemySpawnDelay &&
+                gameState.enemies.length < gameState.maxEnemies) {
+                gameState.enemies.push(createEnemy());
+                gameState.lastEnemyTime = currentTime;
+            }
+
+            gameState.enemies = gameState.enemies.filter(enemy => {
+                enemy.x += enemy.dx * gameState.speedMultiplier;
+                enemy.y += enemy.dy * gameState.speedMultiplier;
+
+                return !(enemy.y > canvas.height + enemy.size * 2 ||
+                        enemy.x < -enemy.size * 2 ||
+                        enemy.x > canvas.width + enemy.size * 2);
+            });
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const playerSize = canvas.height * gameState.player.relativeSize;
+
+            // Draw player with level
+            ctx.fillStyle = 'blue';
+            ctx.fillRect(
+                (canvas.width - playerSize) / 2,
+                canvas.height - playerSize,
+                playerSize,
+                playerSize
+            );
+
+            // Player level text
+            ctx.fillStyle = 'white';
+            ctx.font = `${playerSize * 0.5}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+                gameState.player.level,
+                (canvas.width) / 2,
+                canvas.height - playerSize / 2
+            );
+
+            // Draw enemies with their levels
+            gameState.enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
+
+                // Enemy level text
+                ctx.fillStyle = 'white';
+                ctx.font = `${enemy.size * 0.6}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(
+                    enemy.level,
+                    enemy.x + enemy.size / 2,
+                    enemy.y + enemy.size / 2
+                );
+            });
+
+            // Update score display
+            scoreDisplay.textContent = `Score: ${gameState.score}`;
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
