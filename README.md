@@ -1,4 +1,5 @@
 # Gamefied typing
+This is a game to help me learn to type. It has been more than ten years since I've touched an html or css file, so I've asked an AI chat to start it up for me. Then I started fixing it.
 ## Prompt
 ```
 Build a browser game with the following requirements:
